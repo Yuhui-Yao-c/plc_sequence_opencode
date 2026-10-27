@@ -89,10 +89,25 @@ def run(source,out_dir,pattern=None):
   if key not in seen:
    seen.add(key);rows.append({f:stage.get(f,'') for f in FIELDS})
  # v9.7 SOURCE-ONLY explicit guard relations augment, never replace the recall pool.
+ # A CASE selector is executable read evidence even if strict parsing failed.
+ # Preserve discovery as state-exit candidates; never invent a numeric successor.
+ inventory_pairs={(r['开始标签'],r['结束标签'],r.get('证据POU','')) for r in rows}
+ for observed in source_graph.get('state_observations',[]):
+  if observed.get('kind')!='case_selector':continue
+  variable=observed['variable'];start=f"{variable}={observed['value']}";end=f'NOT ({start})'
+  scope=observed.get('entry',observed.get('scope',''))
+  key=(start,end,scope)
+  if key in inventory_pairs:continue
+  inventory_pairs.add(key)
+  rows.append({'构成要素':scope,'动作':'CASE状态退出阶段候选','动作描述':'CASE选择器观察；控制流及工艺意义待核验',
+    '开始标签':start,'结束标签':end,'状态':'state_exit','证据POU':scope,
+    '证据节点':str(observed.get('node','case_state_inventory')),'原始条件':'',
+    '控制器':variable,'分支数':0})
  existing_boundary_pairs={(r['开始标签'],r['结束标签']) for r in rows}
  for rel in source_graph['transitions']:
   start=f"{rel['variable']}={rel['from']}"; end=f"{rel['variable']}={rel['to']}"
-  choices=[(start,end,'source_supported_transition'),(start,f'NOT ({start})','state_exit')]
+  relation_status='source_supported_transition' if rel.get('guard_complete') is True else 'source_transition_unverified'
+  choices=[(start,end,relation_status),(start,f'NOT ({start})','state_exit')]
   # SMC2 stage_records already carry these sourced pairs with local comments.
   # Do not inflate the pool with a second generic copy of every sourced edge.
   if fmt in ('smc2','omron_iec61131_10'):

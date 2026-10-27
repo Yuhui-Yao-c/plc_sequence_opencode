@@ -52,7 +52,7 @@ def discover(graph:dict,max_hops:int=16)->dict:
     for c in graph.get('native_commands',[]):
         a=atom(c.get('start',''))
         if a:cmds[(c['scope'],a.args[0].casefold(),a.args[1])].append(c)
-    state_vars={x.get('variable','').casefold() for x in graph.get('state_observations',[]) if x.get('kind') in ('comparison','st_comparison')}
+    state_vars={x.get('variable','').casefold() for x in graph.get('state_observations',[]) if x.get('kind') in ('comparison','st_comparison','case_selector')}
     tail={};reviews=[]
     for sl in graph.get('native_inline_slices',[]):
         seeds=[a for a in (atom(x) for x in sl.get('state_seeds',[])) if a]

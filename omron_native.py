@@ -293,6 +293,13 @@ def collect_native(source):
         for m in ASSIGN.finditer(clean):
             v=symbol(m.group(1));n=integer(m.group(2));writes.add(v)
             if n is not None:observe(v,n,'st_assignment',scope,network,node,line,comment,binding_of(v,scope,pou))
+        from st_state_inventory import discover_cases, recover_guarded_writes
+        case_states,_=discover_cases(code)
+        for state in case_states:
+            v=state['variable']
+            observe(v,state['value'],'case_selector',scope,network,node,line,comment,binding_of(v,scope,pou))
+        effect['case_selectors']=case_states
+        parser=None
         try:
             parser=STParser(code,condition_parser=conditions.parse);parser.seq()
             for v,dest,g,pos,rhs in parser.writes:
@@ -330,7 +337,22 @@ def collect_native(source):
                 events.append(['omron_iec61131_10',scope,str(network),guard,'ST_assignment',f"{x['variable']}:={x['value']}",'','','structured_ST_observation','local_control',comment])
         except (WireError,NativeWireError,BoundarySyntaxError) as ex:
             stats['unsupported_st_bodies']+=1;effect['issue']=str(ex)
-            for v in sorted(writes):block(v,scope,network,node,'unsupported_ST:'+str(ex),binding_of(v,scope,pou))
+            effect['error_token']=parser.i if parser else None
+            effect['error_context']=' '.join(parser.ts[max(0,parser.i-8):parser.i+8]) if parser else ''
+            effect['variables']=sorted(writes|{s['variable'] for s in case_states})
+            for v in effect['variables']:block(v,scope,network,node,'unsupported_ST:'+str(ex),binding_of(v,scope,pou))
+            for item in recover_guarded_writes(code,parser,conditions.parse):
+                v,dest=item['variable'],item['to'];g=combine('and',external,item['guard'])
+                froms=sorted({a.args[1] for a in comparisons(g) if a.kind=='eq' and a.args[0].casefold()==v.casefold() and compatible(g,v,a.args[1])})
+                for src in froms:
+                    tid=f'T{len(transitions)+1:07d}'
+                    transitions.append({'id':tid,'scope':scope,'binding_scope':binding_of(v,scope,pou),
+                        'body':f'{network};line:{line};{node}','variable':v,'from':src,'to':dest,
+                        'guard':g.text(),'guard_complete':False,'evidence':'omron_native_partial_st_guard',
+                        'path':[node,f"token:{item['token']}"],
+                        'timing_proof':'partial_ST_fragment; outer flow, opaque effects and scan order unresolved'})
+                    add_stage(v,src,dest,g.text(),False,scope,network,tid,line,comment,
+                              binding_of(v,scope,pou),[node],'omron_native_partial_st_guard')
             if writes:warnings.append(f'{scope}/{network}/line:{line}: {ex}')
         inline_slices.append(effect)
     # ST nested inside InlineST is consumed with its rung exactly once.
@@ -455,7 +477,7 @@ def collect_native(source):
             'commands':len(commands),'comment':comment})
         rung.clear()
         while rung.getprevious() is not None:del rung.getparent()[0]
-    compvars={s['variable'] for s in states if s['kind'] in ('comparison','st_comparison')}
+    compvars={s['variable'] for s in states if s['kind'] in ('comparison','st_comparison','case_selector')}
     for target,scope,network,node,pou_name in opaque_targets:
         for v in sorted(compvars):
             if v.casefold()==target.casefold() or v.casefold().startswith(target.casefold()+'['):
@@ -474,6 +496,7 @@ def collect_native(source):
         'stage_records':stages,'stage_events':[], 'native_events':events,'native_commands':command_records,
         'native_partial_transitions':partial,'native_inline_slices':inline_slices,
         'source_predicates':source_predicates,'temporal_dependencies':temporal_dependencies,'native_rung_inventory':discovery,
+        'st_parse_issues':[{k:s.get(k) for k in ('scope','network','node','source_line','issue','error_token','error_context','variables')} for s in inline_slices if s.get('issue')],
         'native_parse_audit':{'format':'omron_iec61131_10','counts':dict(stats),'object_types':dict(types),
             'health':'parsed_with_explicit_limits','no_pattern_applied_during_parse':True,
             'gt_access':False,'warnings':['Local guards only; unresolved control paths are retained, not certified.']},
@@ -491,7 +514,7 @@ def make_recall(model):
     byvar=defaultdict(lambda: {'compares':set(),'writes':set(),'sources':set(),'comments':{}})
     for r in model['state_observations']:
         key=(r['variable'],r.get('binding_scope',''));d=byvar[key]
-        d['compares' if r['kind'] in ('comparison','st_comparison') else 'writes'].add(r['value'])
+        d['compares' if r['kind'] in ('comparison','st_comparison','case_selector') else 'writes'].add(r['value'])
         d['sources'].add(r['entry']);d['comments'].setdefault(r['value'],r['comment'])
     rows=[];controllers={}
     for (v,bs),d in sorted(byvar.items()):

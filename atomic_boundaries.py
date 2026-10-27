@@ -159,13 +159,20 @@ class AtomicProjector:
             if scope_issue:return Projection(status='作用域待核验',reason=scope_issue)
             matching=[e for e in es if e['variable'].casefold()==b.args[0].casefold()
                       and int(e['from'])==a.args[1] and int(e['to'])==b.args[1]]
+            source_ids=set(str(row.get('证据节点','')).split(';'))
+            partial=[e for e in self.graph.get('transitions',[]) if e.get('id') in source_ids
+                     and e.get('evidence') in ('omron_native_partial_st_guard','st_partial_guard')
+                     and e.get('guard_complete') is not True
+                     and e.get('variable','').casefold()==a.args[0].casefold()==b.args[0].casefold()
+                     and e.get('from')==a.args[1] and e.get('to')==b.args[1]]
             return Projection(rows=[{'开始标签':a.text(),'结束标签':b.text(),
-                       '证据等级':'源码局部迁移' if matching else '原始单对-路径未证明',
-                       '全局退出等价':'不适用','计时使用方式':'按本行起止配对；检查分支门控及循环实例',
-                       '迁移证据ID':';'.join(e['id'] for e in matching)}],
+                       '证据等级':'源码ST片段迁移-待核验' if partial else '源码局部迁移' if matching else '原始单对-路径未证明',
+                       '全局退出等价':'否/未证明' if partial else '不适用','计时使用方式':'按本行起止配对；检查分支门控及循环实例',
+                       '迁移证据ID':';'.join(e['id'] for e in matching+partial)}],
                        status='原子标签保留',reason='原始起止均为单状态；保留不是动作/时序正确性证明',
-                       strict_equivalence=True,paths=[{'start':a.args[1],'end':b.args[1],
-                       'edges':matching}])
+                       strict_equivalence=not partial,
+                       issues=['ST局部片段恢复；外层门控、未知副作用及完整执行路径仍待核验'] if partial else [],
+                       paths=[{'start':a.args[1],'end':b.args[1],'edges':matching+partial}])
         feedback = self.feedback_resolver.resolve(row)
         if feedback.applicable:
             return Projection(rows=feedback.rows, status=feedback.status,

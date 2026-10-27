@@ -238,6 +238,7 @@ class STParser:
 
 def collect(source):
     source=Path(source);transitions=[];blockers=[];observations=[];warnings=[];bodies=0
+    state_observations=[];st_parse_issues=[]
     from source_format import detect_source_format
     fmt=detect_source_format(source)
     if fmt=='omron_iec61131_10':
@@ -278,13 +279,30 @@ def collect(source):
             bodies+=1;scope,pou=owner(body);body_id=f'{scope}/{tag(body)}/{bodies}'
             if tag(body)=='ST':
                 code=text(body);parser=STParser(code)
+                from st_state_inventory import discover_cases,recover_guarded_writes
+                case_states,_=discover_cases(code)
+                for item in case_states:
+                    state_observations.append({**item,'entry':scope,'network':body_id,
+                        'node':f"token:{item['token']}",'source_line':body.sourceline or 0,
+                        'binding_scope':binding(item['variable'],scope,pou)})
                 try:
                     parser.seq()
                     for var,dest,guard,pos,rhs in parser.writes:emit(scope,pou,body_id,var,dest,guard,'st_structured_guard',[f'token:{pos}'])
                     observations.extend({**a,'scope':scope,'source':'ST_bool_assignment'} for a in parser.actions)
                 except (WireError,BoundarySyntaxError) as e:
-                    vars_=set(re.findall(rf'({IDENT})\s*:=',code))
+                    vars_=set(re.findall(rf'({IDENT})\s*:=',code))|{s['variable'] for s in case_states}
                     for v in vars_:block(scope,symbol(v),'unsupported_ST_body:'+str(e),None,binding(symbol(v),scope,pou))
+                    st_parse_issues.append({'scope':scope,'source_line':body.sourceline or 0,'issue':str(e),
+                        'error_token':parser.i,'error_context':' '.join(parser.ts[max(0,parser.i-8):parser.i+8]),
+                        'variables':sorted(vars_)})
+                    for item in recover_guarded_writes(code,parser):
+                        v=item['variable'];g=item['guard']
+                        for src in sorted({a.args[1] for a in comparisons(g) if a.kind=='eq' and a.args[0].casefold()==v.casefold() and compatible(g,v,a.args[1])}):
+                            transitions.append({'id':f'T{len(transitions)+1:07d}','scope':scope,
+                                'binding_scope':binding(v,scope,pou),'body':body_id,'variable':v,
+                                'from':src,'to':item['to'],'guard':g.text(),'guard_complete':False,
+                                'evidence':'st_partial_guard','path':[f"token:{item['token']}"],
+                                'timing_proof':'partial_ST_fragment; outer flow and opaque side effects unresolved'})
                     warnings.append(body_id+': '+str(e))
             else:
                 wire=WireBody(body)
@@ -321,6 +339,7 @@ def collect(source):
     return {'schema':'plc.state_transitions.v1','adapter':fmt,'source_sha256':sha256(source),
             'source_name':source.name,'source_size':source.stat().st_size,'transitions':transitions,
             'blockers':blockers,'observations':observations,'warnings':warnings,
+            'state_observations':state_observations,'st_parse_issues':st_parse_issues,
             'summary':{'bodies':bodies,'transitions':len(transitions),'blockers':len(blockers)},
             'limits':['Supported local source transitions only; not a whole-program temporal proof.',
                       'External libraries/indirect writes/tasks/scan acquisition are not resolved.',
@@ -333,6 +352,9 @@ def write_graph(source,out,model=None):
     fields=['id','scope','binding_scope','body','variable','from','to','guard','guard_complete','evidence','path','timing_proof']
     with (out/'source_transition_edges.csv').open('w',encoding='utf-8-sig',newline='') as f:
         w=csv.DictWriter(f,fieldnames=fields);w.writeheader();w.writerows(rows)
+    if graph.get('adapter')=='plcopen':
+        from boundary_normalizer import write_csv
+        write_csv(out/'source_state_inventory.csv',graph.get('state_observations',[]))
     if graph.get('adapter') in ('smc2','omron_iec61131_10'):
         from boundary_normalizer import write_csv
         write_csv(out/'source_state_inventory.csv',graph.get('state_observations',[]))

@@ -24,7 +24,12 @@ def filter_csv(input_path,output_path,pattern):
  output_path=Path(output_path);output_path.parent.mkdir(parents=True,exist_ok=True)
  with open(output_path,'w',encoding='utf-8-sig',newline='') as f:
   writer=csv.DictWriter(f,fieldnames=fields);writer.writeheader();writer.writerows(selected)
- return {'before':len(original),'after':len(selected),'removed':len(original)-len(selected),'pattern':pattern}
+ mode='regex' if pattern.startswith(('re:','regex:')) else 'glob'
+ warnings=[]
+ if mode=='glob' and r'\.' in pattern:
+  warnings.append('glob模式中的点无需反斜杠转义；请直接写点，或使用re:前缀显式选择正则模式。')
+ return {'before':len(original),'after':len(selected),'removed':len(original)-len(selected),'pattern':pattern,
+         'pattern_mode':mode,'compiled_pattern':glob_regex(pattern).pattern,'pattern_warnings':warnings}
 if __name__=='__main__':
  p=argparse.ArgumentParser();p.add_argument('source');p.add_argument('-o','--out',required=True);p.add_argument('--pattern',required=True);a=p.parse_args()
  print(json.dumps(filter_csv(a.source,a.out,a.pattern),ensure_ascii=False))

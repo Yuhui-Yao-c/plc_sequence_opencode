@@ -194,6 +194,10 @@ def collect_smc2(source):
                         opaque_writers.append((symbol(target),{k:v for k,v in loc.items() if k!='net'},node.get('Ix',i)))
             elif node.get('__type')=='IST' and node.get('TXT'):
                 code=str(node['TXT']);clean=' '.join(st_tokens(code));vars_=set()
+                from st_state_inventory import discover_cases
+                case_states,_=discover_cases(code)
+                for item in case_states:
+                    add_state(item['variable'],item['value'],'case_selector',loc,node.get('Ix',i),comment)
                 for m in COMPARE_RE.finditer(clean):
                     v=symbol(m.group(1));n=integer(m.group(3))
                     if n is not None:add_state(v,n,'st_comparison',loc,node.get('Ix',i),comment,m.group(2))
@@ -220,7 +224,7 @@ def collect_smc2(source):
                     diagnostics.append({'entry':loc['entry'],'network':loc['network'],'source_line':loc['source_line'],
                         'variable':var,'comment_number':number,'actual_comparison_values':';'.join(map(str,sorted(vals))),
                         'comment':comment,'diagnosis':'注释数字与同网络比较值不同；可能过期或指代其他流程，不自动修正'})
-    observed_vars={r['variable'] for r in states if r['kind'] in ('comparison','st_comparison')}
+    observed_vars={r['variable'] for r in states if r['kind'] in ('comparison','st_comparison','case_selector')}
     for target,loc,node in opaque_writers:
         for var in observed_vars:
             if var.casefold()==target.casefold() or var.casefold().startswith(target.casefold()+'['):

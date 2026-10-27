@@ -18,7 +18,7 @@ def local(e):return etree.QName(e).localname
 def extract(src):
     parser=etree.XMLParser(resolve_entities=False,no_network=True,huge_tree=True)
     root=etree.parse(str(src),parser).getroot()
-    observations=collections.defaultdict(lambda:{'values':set(),'sources':set(),'assigns':set(),'compares':set()})
+    observations=collections.defaultdict(lambda:{'values':set(),'sources':set(),'assigns':set(),'compares':set(),'case_selectors':set()})
     transitions=set(); unit_count=0
     # Do not recurse through the graph: each LD instance is processed once.
     for unit in root.iter():
@@ -31,6 +31,10 @@ def extract(src):
             par=par.getparent()
         if local(unit)=='ST':
             st=''.join(unit.itertext())
+            from st_state_inventory import discover_cases
+            for item in discover_cases(st)[0]:
+                d=observations[item['variable']];d['values'].add(item['value'])
+                d['case_selectors'].add(item['value']);d['sources'].add(owner)
             for m in RE_ASSIGN.finditer(st):
                 v,n=m.groups(); d=observations[v];d['values'].add(int(n));d['assigns'].add(int(n));d['sources'].add(owner)
             for m in RE_COMPARE.finditer(st):
@@ -82,10 +86,22 @@ def extract(src):
 
 def generate(src,out):
     ob,units=extract(src)
-    controllers={v:d for v,d in ob.items() if len(d['values'])>=3 and len(d['compares'])>=3}
+    controllers={v:d for v,d in ob.items() if d['case_selectors'] or (len(d['values'])>=3 and len(d['compares'])>=3)}
     rows=[]
     for v,d in sorted(controllers.items()):
         states=sorted(d['values']); observed=d['assigns']|d['compares']
+        if d['case_selectors']:
+            for a in states:
+                rows.append({'构成要素':';'.join(sorted(d['sources'])[:3]),'动作':'CASE状态退出阶段候选',
+                    '动作描述':'CASE选择器及字面量赋值观察；迁移控制流另行核验',
+                    '开始标签':f'{v}={a}','结束标签':f'NOT ({v}={a})','状态':'state_exit',
+                    '证据POU':';'.join(sorted(d['sources'])[:3]),'证据节点':'case_state_inventory',
+                    '原始条件':'','控制器':v,'分支数':0})
+        if not (len(d['values'])>=3 and len(d['compares'])>=3):
+            continue
+        # Preserve the historical supplementary pairs when CASE-only values are
+        # newly discovered; discovery must not replace an old adjacency record.
+        states=sorted(d['assigns']|d['compares'])
         for i,a in enumerate(states):
             # Speculative interval between neighboring OBSERVED states, not a verified branch.
             if i+1<len(states):

@@ -9,7 +9,8 @@ from boundary_logic import parse,canonical,positive_states,comparisons,BoundaryS
 from boundary_normalizer import load_graph,empty_graph,normalize_rows,write_csv
 
 LAYERS=[('全量候选','sequence_candidates.csv'),('名称过滤','sequence_candidates_filtered.csv'),
-        ('完整候选对','prediction_candidate_pairs.csv'),('完整最终对','final_prediction_pairs.csv'),
+         ('完整候选对','prediction_candidate_pairs.csv'),('原子标签对','prediction_atomic_pairs.csv'),
+         ('主采集视图','prediction_collection_pairs.csv'),('完整最终对','final_prediction_pairs.csv'),
         ('工艺精选','final_process_steps.csv')]
 
 def read_rows(p):
@@ -26,6 +27,10 @@ def diagnose(run,start,end='',graph=None):
     var,values=label
     obs=[r for r in graph.get('state_observations',[]) if r['variable'].casefold()==var.casefold() and r['value'] in values]
     edges=[r for r in graph.get('transitions',[]) if r['variable'].casefold()==var.casefold() and r['from'] in values]
+    blockers=[r for r in graph.get('blockers',[]) if r.get('variable','').casefold()==var.casefold()
+              and (r.get('from') is None or r.get('from') in values)]
+    parse_issues=[r for r in graph.get('st_parse_issues',[]) if var.casefold() in
+                  {v.casefold() for v in r.get('variables',[])}]
     comments=[r for r in graph.get('comment_state_diagnostics',[]) if r['variable'].casefold()==var.casefold() and r['comment_number'] in values]
     layers=[];sk=canonical(start);ek=canonical(end) if end else None
     for title,filename in LAYERS:
@@ -49,6 +54,7 @@ def diagnose(run,start,end='',graph=None):
     else:status='当前源码索引未见该状态；版本/标签待核验';reason='未在已解析的可执行状态比较/赋值中找到；不据此自动判GT错误，更不能由注释补造状态。'
     return {'开始标签':start,'结束标签':end,'诊断':status,'说明':reason,'源码SHA256':graph.get('source_sha256',''),
             '源码名称':graph.get('source_name',''),'源码状态证据':obs,'源码后继':edges,
+            '源码阻断项':blockers,'ST解析问题':parse_issues,'解析警告':graph.get('warnings',[]),
             '相关注释冲突':comments,'输出阶段':layers,'解析限制':graph.get('limits',graph.get('warnings',[])),
             '行号口径':'输出阶段行号为CSV记录行号（含表头），不是含多行单元格的文本物理行号','不是覆盖率统计':not bool(end)}
 
