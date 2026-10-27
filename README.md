@@ -1,3 +1,17 @@
+# v9.14 CASE状态召回与ST失败诊断（2026-10-27）
+
+修复CASE与不透明调用等语句共存时，整块ST解析失败导致状态证据和候选一起丢失的问题。新增独立CASE状态发现；能恢复的片段迁移保留为待核验候选，完整门控、未知写入与扫描顺序限制继续保留。
+
+- 版本：`python plc_cli.py --version`；测试：`python -m unittest discover -q`（314项）。
+- 合成复现：`python validation/reproduce_case_loss_v9_14.py --out outputs/case_regression_v9_14 --expected fixed`。
+- 名称模式默认glob：`stEM*.ProcessCtrl.iCmdStep`；正则：`re:stEM.*\.ProcessCtrl\.iCmdStep`。
+- 漏标签：用 `diagnose_labels.py` 查看状态、候选、主采集层、源码阻断及ST解析位置。
+- OpenCode的既有Agent与四个Skill配置已恢复入库；预测/评价入口与输出文件保持兼容。
+
+变更详见 [CHANGELOG_v9_14.md](CHANGELOG_v9_14.md)，验证、升级和回退见 [RELEASE_v9_14.md](RELEASE_v9_14.md)。本轮使用合成复现及回归测试，尚未全量重跑所述新PLC项目。
+
+---
+
 # v9.13 到位反馈→逻辑后继（2026-10-26）
 
 本版重点补充：现有预测是状态对，人工或工艺草表是“状态 AND 到位”时，如何找到源码支持的直接后继。

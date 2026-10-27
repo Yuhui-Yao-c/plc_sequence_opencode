@@ -5,6 +5,8 @@ from pathlib import Path
 from workflow import create, validate
 from pair_evaluation import run as evaluate_candidates
 
+APP_VERSION=Path(__file__).with_name('VERSION').read_text(encoding='utf-8').strip()
+
 def fingerprint(p):
  h=hashlib.sha256()
  with Path(p).open('rb') as f:
@@ -19,7 +21,7 @@ def predict(args):
  # Deliberately no --gt argument or gold-file discovery in prediction.
  if out==src.parent or out==src:raise ValueError('输出必须位于独立目录，不能覆盖源码所在目录')
  manifest=create(str(src),str(out),batch_size=args.batch_size,pattern=args.pattern,force=args.force)
- prov={'version':'9.13.0','source_format':json.loads((out/'candidate_audit.json').read_text(encoding='utf-8'))['format'],'pipeline_order':['source_parse_all','source_cross_fb_protocols','name_filter','boundary_normalization','action_signal_tail_composition','optional_process_review'],'mode':'prediction','source_sha256':fingerprint(src),'source_name':src.name,'pattern':args.pattern,'candidate_sha256':fingerprint(out/'sequence_candidates.csv'),'prediction_has_gt_access':False,'status':'prepared_needs_opencode_batches','workflow_manifest':'workflow_manifest.json'}
+ prov={'version':APP_VERSION,'source_format':json.loads((out/'candidate_audit.json').read_text(encoding='utf-8'))['format'],'pipeline_order':['source_parse_all','source_cross_fb_protocols','name_filter','boundary_normalization','action_signal_tail_composition','optional_process_review'],'mode':'prediction','source_sha256':fingerprint(src),'source_name':src.name,'pattern':args.pattern,'candidate_sha256':fingerprint(out/'sequence_candidates.csv'),'prediction_has_gt_access':False,'status':'prepared_needs_opencode_batches','workflow_manifest':'workflow_manifest.json'}
  prov['atomic_output_sha256']=fingerprint(out/'prediction_collection_pairs.csv')
  prov['atomic_archive_sha256']=fingerprint(out/'prediction_atomic_pairs.csv')
  prov['full_pair_archive_sha256']=fingerprint(out/'prediction_candidate_pairs.csv')
@@ -92,7 +94,8 @@ def evaluate(args):
  return result
 
 def main():
- p=argparse.ArgumentParser(description='PLC Agent v9.13，候选保全、逻辑后继统一、预测评价隔离')
+ p=argparse.ArgumentParser(description=f'PLC Agent v{APP_VERSION}，CASE状态召回、候选保全、预测评价隔离')
+ p.add_argument('--version',action='version',version=f'%(prog)s {APP_VERSION}')
  sub=p.add_subparsers(dest='mode',required=True)
  x=sub.add_parser('predict',help='源码+变量模式；不接受GT')
  x.add_argument('--source',required=True);x.add_argument('--pattern');x.add_argument('--out',required=True);x.add_argument('--batch-size',type=int,default=120);x.add_argument('--force',action='store_true');x.set_defaults(func=predict)

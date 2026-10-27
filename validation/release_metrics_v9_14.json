@@ -1,0 +1,160 @@
+{
+  "version": "9.14.0",
+  "release_date": "2026-10-27",
+  "base_commit": "c435d44cd657fb3fc7067a8a16d689a22c9262ef",
+  "tests": {
+    "original": 290,
+    "added": 24,
+    "passed": 314,
+    "command": "python -W ignore::ResourceWarning -m unittest discover -q",
+    "log": "validation/test_run_v9_14.txt"
+  },
+  "scope": "Synthetic native XML reproduction and repository regression tests; no full run of the new PLC project, real LLM process batches, or online PLC sampling.",
+  "baseline_reproduction": {
+    "expected_version": "baseline",
+    "fixtures": [
+      {
+        "fixture": "clean",
+        "step_inventory_kinds": {
+          "st_assignment": 2,
+          "st_comparison": 2
+        },
+        "step_transitions": 2,
+        "proven_step_transitions": 2,
+        "step_candidates": 4,
+        "command_candidates": 29,
+        "filtered_candidates": 4,
+        "collection_pairs": 2,
+        "atomic_review_rows": 0,
+        "parse_warnings": []
+      },
+      {
+        "fixture": "opaque_call",
+        "step_inventory_kinds": {
+          "st_assignment": 2
+        },
+        "step_transitions": 0,
+        "proven_step_transitions": 0,
+        "step_candidates": 0,
+        "command_candidates": 29,
+        "filtered_candidates": 0,
+        "collection_pairs": 0,
+        "atomic_review_rows": 0,
+        "parse_warnings": [
+          "Demo::Logic/ST/line:1: ST opaque call/statement may write state"
+        ]
+      }
+    ],
+    "pattern_checks": [
+      {
+        "input": "stEM*.ProcessCtrl.iCmdStep",
+        "compiled": "^stEM.*\\.ProcessCtrl\\.iCmdStep$",
+        "matches": true
+      },
+      {
+        "input": "stEM*\\.ProcessCtrl\\.iCmdStep",
+        "compiled": "^stEM.*\\\\\\.ProcessCtrl\\\\\\.iCmdStep$",
+        "matches": false
+      },
+      {
+        "input": "re:stEM.*\\.ProcessCtrl\\.iCmdStep",
+        "compiled": "stEM.*\\.ProcessCtrl\\.iCmdStep",
+        "matches": true
+      }
+    ],
+    "checks": {
+      "clean_counts": true,
+      "opaque_counts": true,
+      "pattern_semantics": true
+    },
+    "success": true
+  },
+  "fixed_reproduction": {
+    "expected_version": "fixed",
+    "fixtures": [
+      {
+        "fixture": "clean",
+        "step_inventory_kinds": {
+          "st_assignment": 2,
+          "case_selector": 2,
+          "st_comparison": 2
+        },
+        "step_transitions": 2,
+        "proven_step_transitions": 2,
+        "step_candidates": 4,
+        "command_candidates": 29,
+        "filtered_candidates": 4,
+        "collection_pairs": 2,
+        "atomic_review_rows": 0,
+        "parse_warnings": []
+      },
+      {
+        "fixture": "opaque_call",
+        "step_inventory_kinds": {
+          "st_assignment": 2,
+          "case_selector": 2
+        },
+        "step_transitions": 2,
+        "proven_step_transitions": 0,
+        "step_candidates": 4,
+        "command_candidates": 29,
+        "filtered_candidates": 4,
+        "collection_pairs": 2,
+        "atomic_review_rows": 4,
+        "parse_warnings": [
+          "Demo::Logic/ST/line:1: ST opaque call/statement may write state"
+        ]
+      }
+    ],
+    "pattern_checks": [
+      {
+        "input": "stEM*.ProcessCtrl.iCmdStep",
+        "compiled": "^stEM.*\\.ProcessCtrl\\.iCmdStep$",
+        "matches": true
+      },
+      {
+        "input": "stEM*\\.ProcessCtrl\\.iCmdStep",
+        "compiled": "^stEM.*\\\\\\.ProcessCtrl\\\\\\.iCmdStep$",
+        "matches": false
+      },
+      {
+        "input": "re:stEM.*\\.ProcessCtrl\\.iCmdStep",
+        "compiled": "stEM.*\\.ProcessCtrl\\.iCmdStep",
+        "matches": true
+      }
+    ],
+    "checks": {
+      "clean_counts": true,
+      "opaque_counts": true,
+      "pattern_semantics": true,
+      "partial_evidence_preserved": true,
+      "unknown_writer_blocked": true
+    },
+    "success": true
+  },
+  "version_smoke": {
+    "version_command": "plc_cli.py 9.14.0",
+    "prediction_provenance_version": "9.14.0",
+    "source_unchanged": true,
+    "prediction_has_gt_access": false
+  },
+  "restored_config": {
+    "source_commit": "93f6c78afdbabbd4977a08ecd7e3dc2333e93622",
+    "archive_sha256": "c5f95bec13914f8890d6b90213b9d71496acb7c4704f5b6dd757b8458b914546",
+    "skill_content_modified": false,
+    "paths": [
+      ".gitignore",
+      ".opencode/agents/plc-sequence.md",
+      ".opencode/skills/plc-boundary-normalization/SKILL.md",
+      ".opencode/skills/plc-cross-fb-transport/SKILL.md",
+      ".opencode/skills/plc-feedback-successor/SKILL.md",
+      ".opencode/skills/plc-signal-tail-merge/SKILL.md"
+    ]
+  },
+  "version_reference": "release/v9.14.0",
+  "commit_structure": [
+    "restore original OpenCode runtime configuration",
+    "preserve CASE state discovery and partial ST review evidence",
+    "record v9.14.0 version, validation and checksums"
+  ]
+}

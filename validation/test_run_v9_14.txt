@@ -1,0 +1,9 @@
+usage: plc_cli.py [-h] [--version] {predict,evaluate,finish} ...
+plc_cli.py: error: unrecognized arguments: --gt truth.tsv
+----------------------------------------------------------------------
+Ran 314 tests in 0.544s
+
+OK
+评估文件： /tmp/tmpquxb6_3m/eval
+评估文件： /tmp/tmpo6bp4bc9/eval
+评估文件： /tmp/tmpza9kph85/eval
